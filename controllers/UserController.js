@@ -95,9 +95,16 @@ module.exports = {
 
   getUser: async (req, res) => {
     const user = await User.findById(req.user);
-    res.json({
+    return res.json({
       displayName: user.displayName,
       id: user._id,
+    });
+  },
+
+  getUserOfPost: async (req, res) => {
+    const user = await User.findOne({ id: req.body.authorId });
+    return res.json({
+      displayName: user.displayName,
     });
   },
 };

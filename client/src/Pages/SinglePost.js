@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState, useCallback } from "react";
-import { useHistory } from "react-router-dom";
+import { useHistory, useParams } from "react-router-dom";
 import UserContext from "../Context/UserContext";
 import HomeLayout from "../Fragments/Home/HomeLayout";
 import Aside from "../Components/Home/Aside";
@@ -12,39 +12,47 @@ import { FaRegComment } from "react-icons/fa";
 import { FaRetweet } from "react-icons/fa";
 import { BsHeart } from "react-icons/bs";
 import { FiUpload } from "react-icons/fi";
-import { BsStars } from "react-icons/bs";
+import TweetButton from "../Fragments/Buttons/TweetButton";
+import SmallTweetButton from "../Fragments/Buttons/SmallTweetButton";
 
-const Home = () => {
+const SinglePost = () => {
+  const [tweet, setTweet] = useState({});
   const [tweets, setTweets] = useState([]);
   const [postModalShow, setPostModalShow] = useState(false);
   const { userData } = useContext(UserContext);
+  const [editing, setEditing] = useState(false);
   const history = useHistory();
+  const params = useParams();
 
   useEffect(() => {
     if (!userData.user) history.push("/login");
   }, [userData.user, history]);
 
+  const getPost = async () => {
+    const post = await Axios.get(`/posts/one/${params.postId}`, {
+      headers: { "x-auth-token": userData.token },
+    });
+    setTweet(post.data);
+  };
+
+  useEffect(() => {
+    getPost();
+  }, []);
+
   const getPosts = async () => {
-    let temp = [];
     const posts = await Axios.get("/posts/all", {
       headers: { "x-auth-token": userData.token },
-    }).then(async (res) => {
-      for (let i = 0; i < res.data.length; i++) {
-        const currentTweet = res.data[i];
-        await Axios.get(`/users/posts`, {
-          authorId: currentTweet.authorId,
-        }).then((res) => {
-          currentTweet.displayName = res.data.displayName;
-          temp.push(currentTweet);
-        });
-      }
     });
-    setTweets(temp);
+    setTweets(posts.data);
   };
 
   useEffect(() => {
     getPosts();
   }, []);
+
+  const updateOneTweet = useCallback(() => {
+    getPost();
+  }, [tweet, getPost]);
 
   const autoUpdateList = useCallback(() => {
     getPosts();
@@ -54,26 +62,40 @@ const Home = () => {
     setPostModalShow(true);
   };
 
+  const deleteTweet = async (postId) => {
+    try {
+      await Axios.delete(`/posts/${postId}`, {
+        headers: { "x-auth-token": userData.token },
+      }).then((res) => {
+        if (res.status === 200) {
+          alert("deleted successfully");
+        }
+      });
+      history.push("/");
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
   return (
     <HomeLayout>
       <Aside show={postModalShow} openPostModal={openPostModal}></Aside>
 
       <FeedContainer>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <h3 style={{ margin: "10px" }}>Home</h3>
-          <BsStars style={{ margin: "10px 10px 0 0" }} />
+        <div>
+          <h3 style={{ margin: "10px" }}>Tweet</h3>
         </div>
         <TweetModal
           show={postModalShow}
           setShow={setPostModalShow}
+          editing={editing}
+          setEditing={setEditing}
+          tweet={tweet}
+          updateOneTweet={updateOneTweet}
           autoUpdateList={autoUpdateList}
         ></TweetModal>
-
-        {tweets.map((tweet, i) => (
-          <TweetContainer
-            key={i}
-            onClick={() => history.push(`/post/${tweet._id}`)}
-          >
+        {tweet._id && (
+          <TweetContainer>
             <div style={{ display: "flex" }}>
               <CgProfile size="50px" />
               <div
@@ -91,12 +113,8 @@ const Home = () => {
                       margin: "0 10px",
                     }}
                   >
-                    <p style={{ margin: "0", fontWeight: "bold" }}>
-                      {tweet.displayName}
-                    </p>
-                    <p style={{ margin: "0", color: "#536471" }}>
-                      @{tweet.displayName}
-                    </p>
+                    <p style={{ margin: "0", fontWeight: "bold" }}>ajspivey</p>
+                    <p style={{ margin: "0", color: "#536471" }}>@ajspivey</p>
                   </div>
                 </div>
                 <p style={{ padding: "10px", margin: "0" }}>{tweet.text}</p>
@@ -113,12 +131,30 @@ const Home = () => {
                 </div>
               </div>
             </div>
+            {tweet.authorId === userData.user.id && (
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <SmallTweetButton
+                  onClick={() => {
+                    setEditing(true);
+                    setPostModalShow(true);
+                  }}
+                >
+                  edit
+                </SmallTweetButton>
+                <SmallTweetButton
+                  color={"red"}
+                  onClick={() => deleteTweet(tweet._id)}
+                >
+                  delete
+                </SmallTweetButton>
+              </div>
+            )}
           </TweetContainer>
-        ))}
+        )}
       </FeedContainer>
       <div style={{ margin: "15px" }}>Whats happening/Messages</div>
     </HomeLayout>
   );
 };
 
-export default Home;
+export default SinglePost;
